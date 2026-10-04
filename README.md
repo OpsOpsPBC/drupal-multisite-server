@@ -110,7 +110,7 @@ sudo provision-drupal-site example.com staging staging.example.com admin@example
 3. Creates a dedicated MySQL database (`{repo_name}_{env}`) and user with a secure generated password.
 4. Generates a persistent `shared/settings.php` file containing database credentials, hash salt, and trusted host patterns.
 5. Sets appropriate ownership (`deploy:www-data`), permissions (`setgid` on upload directories, `440` on `settings.php`), and restricts backups to `deploy:deploy` (`700`).
-6. Creates `/etc/nginx/sites-available/{repo_name}_{env}`, symlinks to `sites-enabled`, tests configuration, and reloads Nginx.
+6. Creates `/etc/nginx/sites-available/{repo_name}_{env}`, symlinks to `sites-enabled`, tests configuration, and reloads Nginx (automatically injecting `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` on staging environments).
 7. Requests an SSL certificate from Let's Encrypt using Certbot (if an email is provided).
 
 ### Deploying Code

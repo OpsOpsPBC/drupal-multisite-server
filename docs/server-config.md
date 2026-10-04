@@ -164,7 +164,7 @@ sudo provision-drupal-site example.com staging staging.example.com admin@example
 3. Provisions isolated MySQL database and user (`{repo_name}_{env}`).
 4. Generates persistent `shared/settings.php` with database credentials, `hash_salt`, and trusted host patterns.
 5. Sets Linux ownership (`deploy:www-data`) and permissions (`setgid` on upload directories).
-6. Configures `/etc/nginx/sites-available/{repo_name}_{env}` including shared `/etc/nginx/snippets/drupal.conf`.
+6. Configures `/etc/nginx/sites-available/{repo_name}_{env}` including shared `/etc/nginx/snippets/drupal.conf` (automatically injecting `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` for staging environments).
 7. Tests Nginx syntax and reloads Nginx.
 8. Provisions free SSL certificates via Certbot.
 

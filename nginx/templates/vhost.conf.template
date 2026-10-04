@@ -6,6 +6,9 @@ server {
 
     root {{WEB_ROOT}};
 
+    # For staging environments only:
+    # add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet" always;
+
     include snippets/drupal.conf;
 
     access_log /var/log/nginx/{{SITE_ID}}_access.log;

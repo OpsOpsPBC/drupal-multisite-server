@@ -166,6 +166,16 @@ echo "==> [6/7] Generating and enabling Nginx virtual host..."
 NGINX_AVAILABLE="/etc/nginx/sites-available/${SITE_ID}"
 NGINX_ENABLED="/etc/nginx/sites-enabled/${SITE_ID}"
 
+STAGING_HEADER=""
+if [[ "$ENV" == "staging" ]]; then
+  STAGING_HEADER="$(cat <<'EOF'
+
+    # Prevent search engines from indexing staging environments
+    add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet" always;
+EOF
+)"
+fi
+
 cat > "$NGINX_AVAILABLE" <<EOF
 server {
     listen 80;
@@ -174,7 +184,7 @@ server {
     server_tokens off;
 
     root ${WEB_ROOT};
-
+${STAGING_HEADER}
     include snippets/drupal.conf;
 
     access_log /var/log/nginx/${SITE_ID}_access.log;
