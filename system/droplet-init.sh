@@ -11,7 +11,11 @@ fi
 
 echo "==> [1/6] Updating apt packages..."
 apt-get update && apt-get upgrade -y
+<<<<<<< HEAD
 apt-get install -y curl git ufw fail2ban unzip software-properties-common ca-certificates lsb-release
+=======
+apt-get install -y curl git ufw fail2ban python3-systemd unzip software-properties-common ca-certificates lsb-release
+>>>>>>> 3d68e6c (Initial commit: Multi-site Drupal hosting infrastructure)
 
 echo "==> [2/6] Adding Ondřej Surý PHP repository..."
 add-apt-repository -y ppa:ondrej/php
