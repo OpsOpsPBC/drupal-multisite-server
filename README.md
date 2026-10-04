@@ -7,7 +7,7 @@ Infrastructure scripts, Nginx configurations, and provisioning tools for hosting
 ## Directory Structure
 
 ```text
-drupal-multisite-server/
+multisite-server-config/
 ├── README.md
 ├── bin/
 │   ├── provision-drupal-site.sh     # Automates Drupal site/environment provisioning
@@ -70,8 +70,8 @@ Run the initial bootstrap script once on a fresh Ubuntu 24.04 server (installs N
 
 ```bash
 # Clone this repository (use sudo if cloning to /opt)
-sudo git clone https://github.com/your-org/drupal-multisite-server.git /opt/drupal-multisite-server
-cd /opt/drupal-multisite-server
+sudo git clone https://github.com/your-org/multisite-server-config.git /opt/multisite-server-config
+cd /opt/multisite-server-config
 
 # Run initial bootstrap
 sudo bash system/droplet-init.sh
@@ -79,18 +79,18 @@ sudo bash system/droplet-init.sh
 
 ### 2. Link CLI scripts to system PATH
 ```bash
-sudo chmod +x /opt/drupal-multisite-server/bin/*.sh
-sudo chmod +x /opt/drupal-multisite-server/system/*.sh
+sudo chmod +x /opt/multisite-server-config/bin/*.sh
+sudo chmod +x /opt/multisite-server-config/system/*.sh
 
 # Symlink CLI commands into /usr/local/bin
-sudo ln -sf /opt/drupal-multisite-server/bin/provision-drupal-site.sh /usr/local/bin/provision-drupal-site
-sudo ln -sf /opt/drupal-multisite-server/bin/provision-static-site.sh /usr/local/bin/provision-static-site
-sudo ln -sf /opt/drupal-multisite-server/bin/deprovision-drupal-site.sh /usr/local/bin/deprovision-drupal-site
+sudo ln -sf /opt/multisite-server-config/bin/provision-drupal-site.sh /usr/local/bin/provision-drupal-site
+sudo ln -sf /opt/multisite-server-config/bin/provision-static-site.sh /usr/local/bin/provision-static-site
+sudo ln -sf /opt/multisite-server-config/bin/deprovision-drupal-site.sh /usr/local/bin/deprovision-drupal-site
 
 # Symlink shared Nginx snippets
 sudo mkdir -p /etc/nginx/snippets
-sudo ln -sf /opt/drupal-multisite-server/nginx/snippets/drupal.conf /etc/nginx/snippets/drupal.conf
-sudo ln -sf /opt/drupal-multisite-server/nginx/snippets/static.conf /etc/nginx/snippets/static.conf
+sudo ln -sf /opt/multisite-server-config/nginx/snippets/drupal.conf /etc/nginx/snippets/drupal.conf
+sudo ln -sf /opt/multisite-server-config/nginx/snippets/static.conf /etc/nginx/snippets/static.conf
 ```
 
 ---

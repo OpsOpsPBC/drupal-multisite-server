@@ -1,7 +1,7 @@
 # Multi-Site Drupal Deployment & Infrastructure Documentation
 
 **GitHub Organization:** `your-org`
-**Infrastructure Repository:** `https://github.com/your-org/drupal-multisite-server`
+**Infrastructure Repository:** `https://github.com/your-org/multisite-server-config`
 
 **Server:** `web-server-01`
 **Stack:** Ubuntu 24.04 LTS · Nginx · PHP-FPM 8.4 · MySQL/MariaDB · Drupal
@@ -117,7 +117,7 @@ cd /var/www/example.com/live/current && ./vendor/bin/drush cr
 
 ## 3. Site Provisioning Automation
 
-To onboard a new website or environment on the droplet, use the automated provisioning script from the `server-infrastructure` repository.
+To onboard a new website or environment on the droplet, use the automated provisioning script from the `multisite-server-config` repository.
 
 ### One-Command Provisioning
 
