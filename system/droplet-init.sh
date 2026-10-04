@@ -11,11 +11,7 @@ fi
 
 echo "==> [1/6] Updating apt packages..."
 apt-get update && apt-get upgrade -y
-<<<<<<< HEAD
-apt-get install -y curl git ufw fail2ban unzip software-properties-common ca-certificates lsb-release
-=======
 apt-get install -y curl git ufw fail2ban python3-systemd unzip software-properties-common ca-certificates lsb-release
->>>>>>> 3d68e6c (Initial commit: Multi-site Drupal hosting infrastructure)
 
 echo "==> [2/6] Adding Ondřej Surý PHP repository..."
 add-apt-repository -y ppa:ondrej/php
@@ -82,10 +78,13 @@ EOF
 systemctl enable fail2ban
 systemctl restart fail2ban || true
 
-echo "==> Installing global Drupal Nginx snippet..."
+echo "==> Installing global Nginx snippets..."
 mkdir -p /etc/nginx/snippets
 if [ -f "${SCRIPT_DIR}/../nginx/snippets/drupal.conf" ]; then
   cp "${SCRIPT_DIR}/../nginx/snippets/drupal.conf" /etc/nginx/snippets/drupal.conf
+fi
+if [ -f "${SCRIPT_DIR}/../nginx/snippets/static.conf" ]; then
+  cp "${SCRIPT_DIR}/../nginx/snippets/static.conf" /etc/nginx/snippets/static.conf
 fi
 
 echo "==> Installing logrotate rule for Drupal sites..."
@@ -98,5 +97,5 @@ echo " Server initialization complete!"
 echo " Next steps:"
 echo " 1. Add your SSH keys to /home/deploy/.ssh/authorized_keys"
 echo " 2. Disable root SSH & password authentication in /etc/ssh/sshd_config"
-echo " 3. Symlink provision-drupal-site.sh into /usr/local/bin/"
+echo " 3. Symlink provision-drupal-site.sh and provision-static-site.sh into /usr/local/bin/"
 echo "=========================================================="

@@ -44,6 +44,8 @@ The server hosts multiple independent websites, each with dedicated **live** and
 | **Live** | `main` | `/var/www/{repo_name}/live` | `/var/www/{repo_name}/live/current/web` | `{repo_name}_live` |
 | **Staging** | `staging` | `/var/www/{repo_name}/staging` | `/var/www/{repo_name}/staging/current/web` | `{repo_name}_staging` |
 
+> **Static Websites:** The server also supports hosting static websites and Single Page Applications (SPAs) alongside Drupal sites with zero database/PHP footprint and instant atomic deployments. See the dedicated [Static Site Hosting Guide](static-sites.md) for full instructions, Nginx templates, and the starter CI/CD workflow.
+
 ---
 
 ## 2. CI/CD Pipeline (GitHub Actions)
@@ -298,4 +300,5 @@ rsync -avz --progress deploy@<server_ip>:/var/www/example.com/live/shared/files/
 | Test Nginx config | `sudo nginx -t` |
 | Reload Nginx | `sudo systemctl reload nginx` |
 | Check disk space | `df -h` |
-| Provision new site | `sudo provision-drupal-site <repo_name> <live\|staging> <domain> [email]` |
+| Provision new Drupal site | `sudo provision-drupal-site <repo_name> <live\|staging> <domain> [email]` |
+| Provision new static site | `sudo provision-static-site <repo_name> <live\|staging> <domain> [email]` |

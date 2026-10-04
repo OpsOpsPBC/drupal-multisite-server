@@ -1,0 +1,16 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{DOMAIN}};
+    server_tokens off;
+
+    root {{WEB_ROOT}};
+
+    # For staging environments only:
+    # add_header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet" always;
+
+    include snippets/static.conf;
+
+    access_log /var/log/nginx/{{SITE_ID}}_access.log;
+    error_log  /var/log/nginx/{{SITE_ID}}_error.log error;
+}

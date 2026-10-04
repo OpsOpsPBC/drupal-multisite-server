@@ -1,6 +1,6 @@
-# Server Infrastructure for Multi-Site Drupal Hosting
+# Server Infrastructure for Multi-Site Hosting
 
-Infrastructure scripts, Nginx configurations, and provisioning tools for hosting multiple Drupal websites on a single DigitalOcean Droplet (Ubuntu 24.04 LTS, PHP 8.4, Nginx, MySQL).
+Infrastructure scripts, Nginx configurations, and provisioning tools for hosting multiple static or Drupal websites on a single DigitalOcean Droplet (Ubuntu 24.04 LTS, PHP 8.4, Nginx, MySQL).
 
 ---
 
@@ -10,21 +10,26 @@ Infrastructure scripts, Nginx configurations, and provisioning tools for hosting
 drupal-multisite-server/
 ├── README.md
 ├── bin/
-│   ├── provision-drupal-site.sh     # Automates new site/environment provisioning
+│   ├── provision-drupal-site.sh     # Automates Drupal site/environment provisioning
+│   ├── provision-static-site.sh     # Automates static site/environment provisioning
 │   └── deprovision-drupal-site.sh   # Safely tears down a site/environment
 ├── docs/
-│   └── server-config.md             # Detailed server topology and admin guide
+│   ├── server-config.md             # Detailed server topology and admin guide
+│   └── static-sites.md              # Static site hosting, config, and deployment guide
 ├── nginx/
 │   ├── snippets/
-│   │   └── drupal.conf              # Shared Drupal rewrites & fastcgi rules
+│   │   ├── drupal.conf              # Shared Drupal rewrites & fastcgi rules
+│   │   └── static.conf              # Shared static site rules, caching & security headers
 │   └── templates/
-│       └── vhost.conf.template      # Nginx server block template
+│       ├── vhost.conf.template      # Nginx server block template (Drupal)
+│       └── vhost-static.conf.template # Nginx server block template (Static sites)
 ├── system/
 │   ├── droplet-init.sh              # One-time bootstrap for fresh servers
 │   ├── sudoers-deploy               # Sudoers permissions for the deploy user
 │   └── logrotate-drupal-sites       # Log rotation for Nginx site access/error logs
 └── templates/
-    └── deploy.yml                   # Starter GitHub Actions deployment workflow for site repos
+    ├── deploy.yml                   # Starter GitHub Actions deployment workflow for Drupal sites
+    └── deploy-static.yml            # Starter GitHub Actions deployment workflow for static sites
 ```
 
 ---
@@ -79,11 +84,13 @@ sudo chmod +x /opt/drupal-multisite-server/system/*.sh
 
 # Symlink CLI commands into /usr/local/bin
 sudo ln -sf /opt/drupal-multisite-server/bin/provision-drupal-site.sh /usr/local/bin/provision-drupal-site
+sudo ln -sf /opt/drupal-multisite-server/bin/provision-static-site.sh /usr/local/bin/provision-static-site
 sudo ln -sf /opt/drupal-multisite-server/bin/deprovision-drupal-site.sh /usr/local/bin/deprovision-drupal-site
 
-# Symlink shared Drupal Nginx snippet
+# Symlink shared Nginx snippets
 sudo mkdir -p /etc/nginx/snippets
 sudo ln -sf /opt/drupal-multisite-server/nginx/snippets/drupal.conf /etc/nginx/snippets/drupal.conf
+sudo ln -sf /opt/drupal-multisite-server/nginx/snippets/static.conf /etc/nginx/snippets/static.conf
 ```
 
 ---
@@ -117,7 +124,8 @@ sudo provision-drupal-site example.com staging staging.example.com admin@example
 
 ### Deploying Code
 
-A starter workflow template is provided at [`templates/deploy.yml`](templates/deploy.yml). Copy it to `.github/workflows/deploy.yml` in your site's repository.
+#### Drupal Sites
+A starter workflow template is provided at [`templates/deploy.yml`](templates/deploy.yml). Copy it to `.github/workflows/deploy.yml` in your Drupal site repository.
 
 Once provisioned and configured with secrets (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`), trigger deployments via GitHub Actions:
 - Push to `main` → deploys to `live` (`/var/www/{repo_name}/live`)
@@ -130,6 +138,15 @@ Once provisioned and configured with secrets (`SSH_HOST`, `SSH_USER`, `SSH_PRIVA
 > 3. Sync media files: `rsync -avz --progress web/sites/default/files/ deploy@<IP>:/var/www/<repo_name>/<env>/shared/files/ --exclude='php/' --exclude='css/' --exclude='js/' --exclude='styles/'`
 > 
 > Future pushes will deploy and update automatically without manual intervention.
+
+#### Static Sites
+Static websites (HTML/CSS/JS, Astro, Vite, Hugo, Next.js SSG, React/Vue SPAs) can also be hosted on this server:
+1. **Provision the site:**
+   ```bash
+   sudo provision-static-site <repo_name> <live|staging> <domain> [certbot_email]
+   ```
+2. **Deploy via GitHub Actions:** Copy [`templates/deploy-static.yml`](templates/deploy-static.yml) to `.github/workflows/deploy.yml` in your static repository and set `BUILD_DIR` (e.g. `'dist'`, `'public'`, or `'.'`).
+3. For complete configuration options, SPA fallback routing, and manual provisioning guidance, see [`docs/static-sites.md`](docs/static-sites.md).
 
 ### Deprovisioning a site
 
