@@ -1,0 +1,11 @@
+# /etc/sudoers.d/deploy
+# Passwordless service reloads for CI/CD automation
+# Note: For least privilege, automated CI/CD accounts should not have unrestricted ALL sudo access.
+deploy ALL=(ALL) NOPASSWD: \
+    /usr/bin/systemctl reload php8.4-fpm, \
+    /usr/bin/systemctl restart php8.4-fpm, \
+    /usr/bin/systemctl reload nginx, \
+    /usr/sbin/nginx -t, \
+    /bin/systemctl reload php8.4-fpm, \
+    /bin/systemctl restart php8.4-fpm, \
+    /bin/systemctl reload nginx

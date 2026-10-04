@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{DOMAIN}};
+    server_tokens off;
+
+    root {{WEB_ROOT}};
+
+    include snippets/drupal.conf;
+
+    access_log /var/log/nginx/{{SITE_ID}}_access.log;
+    error_log  /var/log/nginx/{{SITE_ID}}_error.log error;
+}
