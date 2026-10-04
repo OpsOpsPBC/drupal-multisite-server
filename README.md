@@ -19,10 +19,12 @@ drupal-multisite-server/
 │   │   └── drupal.conf              # Shared Drupal rewrites & fastcgi rules
 │   └── templates/
 │       └── vhost.conf.template      # Nginx server block template
-└── system/
-    ├── droplet-init.sh              # One-time bootstrap for fresh servers
-    ├── sudoers-deploy               # Sudoers permissions for the deploy user
-    └── logrotate-drupal-sites       # Log rotation for Nginx site access/error logs
+├── system/
+│   ├── droplet-init.sh              # One-time bootstrap for fresh servers
+│   ├── sudoers-deploy               # Sudoers permissions for the deploy user
+│   └── logrotate-drupal-sites       # Log rotation for Nginx site access/error logs
+└── templates/
+    └── deploy.yml                   # Starter GitHub Actions deployment workflow for site repos
 ```
 
 ---
@@ -115,7 +117,9 @@ sudo provision-drupal-site example.com staging staging.example.com admin@example
 
 ### Deploying Code
 
-Once provisioned, trigger deployment via GitHub Actions:
+A starter workflow template is provided at [`templates/deploy.yml`](templates/deploy.yml). Copy it to `.github/workflows/deploy.yml` in your site's repository.
+
+Once provisioned and configured with secrets (`SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`), trigger deployments via GitHub Actions:
 - Push to `main` → deploys to `live` (`/var/www/{repo_name}/live`)
 - Push to `staging` → deploys to `staging` (`/var/www/{repo_name}/staging`)
 

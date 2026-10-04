@@ -1,0 +1,288 @@
+# Starter GitHub Actions deployment workflow for Drupal sites hosted on the multisite server.
+#
+# Usage:
+#   Copy this file to `.github/workflows/deploy.yml` in your Drupal site repository.
+#
+# Environment Mapping:
+#   - Push to `main`    -> deploys to live (`/var/www/<repo_name>/live`)
+#   - Push to `staging` -> deploys to staging (`/var/www/<repo_name>/staging`)
+#   - Manual dispatch   -> deploys selected branch to matching environment
+#
+# Required GitHub Secrets (Settings -> Secrets and variables -> Actions):
+#   - SSH_HOST: Droplet hostname or IP address
+#   - SSH_USER: Remote deploy user (typically `deploy`)
+#   - SSH_PRIVATE_KEY: Private SSH key paired with deploy@droplet
+#   - SSH_KNOWN_HOSTS: Output of `ssh-keyscan -H <SSH_HOST>`
+#
+# Optional GitHub Secrets / Environment Variables:
+#   - HEALTH_URL: URL to probe after deployment (e.g. https://example.com)
+
+name: Deploy Drupal
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.event.repository.name }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  PHP_VERSION: '8.4'
+  KEEP_RELEASES: 5
+  TARGET_ENV: ${{ github.ref_name == 'main' && 'live' || 'staging' }}
+  DEPLOY_PATH: /var/www/${{ github.event.repository.name }}/${{ github.ref_name == 'main' && 'live' || 'staging' }}
+
+jobs:
+  build:
+    name: Build artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, xml, gd, curl, zip, intl, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Validate composer files
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      # Optional: If your theme or custom modules require a front-end asset build,
+      # uncomment and adjust the following steps:
+      # - name: Setup Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: 20
+      #     cache: 'npm'
+      # - name: Build front-end assets
+      #   run: |
+      #     npm ci
+      #     npm run build
+
+      - name: Create deployment archive
+        run: |
+          tar -czf /tmp/deploy.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='web/sites/default/files' \
+            --exclude='web/sites/default/settings.php' \
+            --exclude='web/sites/default/settings.local.php' \
+            --exclude='.env*' \
+            .
+          ls -lh /tmp/deploy.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-bundle
+          path: /tmp/deploy.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to ${{ github.ref_name == 'main' && 'live' || 'staging' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'live' || 'staging' }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-bundle
+          path: /tmp
+
+      - name: Verify required secrets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          missing=()
+          [ -z "$SSH_HOST" ]        && missing+=("SSH_HOST")
+          [ -z "$SSH_USER" ]        && missing+=("SSH_USER")
+          [ -z "$SSH_PRIVATE_KEY" ] && missing+=("SSH_PRIVATE_KEY")
+          [ -z "$SSH_KNOWN_HOSTS" ] && missing+=("SSH_KNOWN_HOSTS")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config << EOF
+          Host deploy-target
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%r@%h:%p
+            ControlPersist 10m
+            ServerAliveInterval 30
+            ConnectTimeout 15
+            ConnectionAttempts 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Test SSH connectivity
+        run: |
+          for i in 1 2 3 4 5; do
+            if ssh deploy-target 'echo "SSH OK on $(hostname)"'; then
+              exit 0
+            fi
+            echo "Attempt $i failed, sleeping $((i * 5))s..."
+            sleep $((i * 5))
+          done
+          echo "::error::Could not establish SSH connection after 5 attempts"
+          exit 1
+
+      - name: Copy bundle to server
+        env:
+          REMOTE_TARBALL: /tmp/deploy-${{ github.event.repository.name }}-${{ env.TARGET_ENV }}-${{ github.run_id }}.tar.gz
+        run: |
+          for i in 1 2 3; do
+            if scp /tmp/deploy.tar.gz "deploy-target:$REMOTE_TARBALL"; then
+              exit 0
+            fi
+            echo "scp attempt $i failed, sleeping $((i * 5))s..."
+            sleep $((i * 5))
+          done
+          echo "::error::scp failed after 3 attempts"
+          exit 1
+
+      - name: Deploy on server
+        env:
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          PHP_VERSION: ${{ env.PHP_VERSION }}
+          KEEP_RELEASES: ${{ env.KEEP_RELEASES }}
+          REMOTE_TARBALL: /tmp/deploy-${{ github.event.repository.name }}-${{ env.TARGET_ENV }}-${{ github.run_id }}.tar.gz
+        run: |
+          ssh deploy-target \
+            DEPLOY_PATH="$DEPLOY_PATH" \
+            PHP_VERSION="$PHP_VERSION" \
+            KEEP_RELEASES="$KEEP_RELEASES" \
+            REMOTE_TARBALL="$REMOTE_TARBALL" \
+            'bash -se' << 'EOF'
+            set -euo pipefail
+            trap 'rm -f "$REMOTE_TARBALL"' EXIT
+
+            TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+            RELEASE="${DEPLOY_PATH}/releases/${TIMESTAMP}"
+            CURRENT="${DEPLOY_PATH}/current"
+            SHARED="${DEPLOY_PATH}/shared"
+            BACKUPS="${DEPLOY_PATH}/backups"
+
+            mkdir -p "$RELEASE" "$SHARED/files" "$BACKUPS"
+            echo "==> Extracting release: $RELEASE"
+            tar -xzf "$REMOTE_TARBALL" -C "$RELEASE"
+
+            echo "==> Linking shared resources"
+            rm -rf "$RELEASE/web/sites/default/files"
+            ln -sfn "$SHARED/files" "$RELEASE/web/sites/default/files"
+
+            rm -f "$RELEASE/web/sites/default/settings.php"
+            ln -sfn "$SHARED/settings.php" "$RELEASE/web/sites/default/settings.php"
+
+            echo "==> Ensuring config directory permissions"
+            mkdir -p "$RELEASE/config/sync"
+            chmod -R 775 "$RELEASE/config/sync"
+
+            PREVIOUS=""
+            if [ -L "$CURRENT" ]; then
+              PREVIOUS="$(readlink -f "$CURRENT")"
+            fi
+
+            echo "==> Switching symlink"
+            ln -sfn "$RELEASE" "$CURRENT"
+
+            echo "==> Creating pre-deploy database backup"
+            if [ -n "$PREVIOUS" ] && [ -f "$PREVIOUS/vendor/bin/drush" ]; then
+              "$PREVIOUS/vendor/bin/drush" sql:dump --gzip --result-file="${BACKUPS}/db_${TIMESTAMP}.sql" || true
+            fi
+
+            echo "==> Running Drush deployment commands"
+            cd "$RELEASE"
+            if ! ./vendor/bin/drush deploy -y -v; then
+              echo "::error::drush deploy failed — rolling back code symlink"
+              if [ -n "$PREVIOUS" ]; then
+                ln -sfn "$PREVIOUS" "$CURRENT"
+                ./vendor/bin/drush cr 2>/dev/null || true
+              fi
+              exit 1
+            fi
+
+            echo "==> Reloading PHP-FPM"
+            sudo systemctl reload "php${PHP_VERSION}-fpm"
+
+            echo "==> Pruning old releases and backups (keeping ${KEEP_RELEASES})"
+            ls -1dt "${DEPLOY_PATH}/releases"/*/ 2>/dev/null \
+              | tail -n +$((KEEP_RELEASES + 1)) \
+              | while read -r OLD; do
+                  echo "  Pruning release: $OLD"
+                  chmod -R u+w "$OLD" 2>/dev/null || true
+                  rm -rf "$OLD"
+                done
+
+            ls -1dt "${BACKUPS}"/db_*.sql.gz 2>/dev/null \
+              | tail -n +$((KEEP_RELEASES + 1)) \
+              | xargs -r rm -f
+
+            echo "==> Deploy complete: $TIMESTAMP"
+          EOF
+
+      - name: Health check
+        env:
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "HEALTH_URL not set, skipping"
+            exit 0
+          fi
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL")
+            if [ "$code" = "200" ]; then
+              echo "Health check passed (HTTP $code)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $code, retrying..."
+            sleep 5
+          done
+          echo "::error::Health check failed"
+          exit 1
+
+      - name: Close SSH ControlMaster
+        if: always()
+        run: ssh -O exit deploy-target 2>/dev/null || true

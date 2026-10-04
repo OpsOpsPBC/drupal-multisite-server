@@ -48,7 +48,7 @@ The server hosts multiple independent websites, each with dedicated **live** and
 
 ## 2. CI/CD Pipeline (GitHub Actions)
 
-Deployments are automated via `.github/workflows/deploy.yml`:
+Deployments are automated via `.github/workflows/deploy.yml`. A ready-to-use starter workflow template is provided in this repository at [`templates/deploy.yml`](../templates/deploy.yml).
 
 - Push to `main` → deploys to **live** (`/var/www/{repo_name}/live`)
 - Push to `staging` → deploys to **staging** (`/var/www/{repo_name}/staging`)
